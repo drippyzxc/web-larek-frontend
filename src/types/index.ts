@@ -1,4 +1,3 @@
-//Типы и интерфейсы базовых классов
 export type EventName = string | RegExp;
 export type Subscriber = Function;
 export type EmitterEvent = {
@@ -15,23 +14,18 @@ export interface IEvents {
 	): (data: T) => void;
 }
 
-//Ответ от сервера
 export type ApiListResponse<Type> = {
 	total: number;
 	items: Type[];
 };
 
-//Запросы на сервер
 export type ApiPostMethods = 'POST' | 'PUT' | 'DELETE';
 
-//Методы для Api
 export interface IApi {
 	getCardsList: () => Promise<ICard[]>;
-	// getCard: (id: string) => Promise<ICard>;
 	orderProducts: (order: IOrder) => Promise<IOrderSuccess>;
 }
 
-//Интерфейсы моделей данных
 export interface IAppStatus {
 	catalog: ICard[];
 	basket: ICard[];
@@ -40,8 +34,6 @@ export interface IAppStatus {
 	contact: IOrdersContacts | null;
 	order: IOrder | null;
 }
-
-//Интерфейсы компонентов представления
 
 export interface IPage {
 	counter: number;
@@ -55,9 +47,7 @@ export interface ICard {
 	image: string;
 	title: string;
 	category: string;
-	price: number | null;
-	count?: string;
-	buttonText?: string;
+	price: number;
 }
 
 export interface IOrdersDelivery {

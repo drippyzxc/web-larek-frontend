@@ -83,9 +83,7 @@ interface ICard {
 	image: string;
 	title: string;
 	category: string;
-	price: number | null;
-	count?: string;
-	buttonText?: string;
+	price: number;
 }
 ```
 
@@ -167,7 +165,7 @@ interface IActions {
 
 ## Архитектура приложения
 
-<img src="https://github.com/drippyzxc/web-larek-oop-image/blob/main/3214131413141.drawio.png" />
+<img src="https://github.com/drippyzxc/web-larek-oop-image/blob/main/oop-web-larek2.drawio.png" />
 
 ### Базовый код
 
@@ -263,7 +261,7 @@ interface IActions {
 - `checkContactsValidation()` - валидация формы с почтой и телефоном.
 - `clearBasket()` - очищает корзину.
 
-#### Класс basket
+#### Класс Basket
 
 Класс для отображения товаров в корзине и управления ими.
 
@@ -282,7 +280,7 @@ interface IActions {
 - `set items(items: HTMLElement[])` - устанавливает список товаров.
 - `set total(total: number)` - устанавливает итоговую стоимость.
 
-#### Класс card
+#### Класс Card
 
 Класс для отображения карточки товара.
 
@@ -334,7 +332,7 @@ interface IActions {
 
 - `set address(value: string)` - устанавливает адрес доставки в соответствующее поле формы.
 
-#### Класс product
+#### Класс Product
 
 Класс отвечает за формирование главной страницы и управление её элементами, такими как каталог товаров, корзина и счетчик товаров.
 
@@ -355,7 +353,7 @@ interface IActions {
 - `set catalog(items: HTMLElement[])` - добавляет массив карточек товаров в каталог на странице.
 - `set locked(value: boolean)` - управляет состоянием блокировки экрана.
 
-#### Класс success
+#### Класс Success
 
 Класс отвечает за отображение сообщения об успешном оформлении заказа.
 
@@ -370,3 +368,24 @@ interface IActions {
 Методы:
 
 - `set total` (total: number) - устанавливает итоговую стоимость заказа.
+
+#### Класс Modal
+
+Класс предназначен для отображения модального окна.
+
+Класс `Modal` использует интерфейс `IModalData`, чтобы определить структуру данных, передаваемых в базовый класс `Component`.
+
+Конструктор класса:
+`constructor(container: HTMLElement, protected events: IEvents) ` - принимает DOM-элемент, в котором будет размещено модальное окно, а также объект `events` для обработки событий.
+
+Свойства класса:
+
+- `_closeButton: HTMLButtonElement` - кнопка закрытия модального окна.
+- `_content: HTMLElement` - элемент, содержащий контент модального окна.
+
+Методы:
+
+- `set content(value: HTMLElement)` - устанавливает содержимое модального окна.
+- `open()` - открывает модальное окно.
+- `close()` - закрывает модальное окно.
+- `render(data: IModalData): HTMLElement` - создает модальное окно на основе переданных данных и открывает его.
