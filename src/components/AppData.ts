@@ -1,22 +1,49 @@
-import {
-	FormErrors,
-	IAppStatus,
-	ICard,
-	IOrder,
-	IOrdersContacts,
-	IOrdersDelivery,
-} from '../types/index';
 import { Model } from './base/model';
-import _ from 'lodash';
+import {
+	IFormErrors,
+	IAppStatus,
+	IOrderAPI,
+	IProduct,
+	IOrder,
+	IOrderForm,
+	IOrdersDelivery,
+	IOrdersContacts,
+} from '../types/index';
 
 export type CatalogChangeEvent = {
-	catalog: ICard[];
+	catalog: Product[];
 };
 
+export class Product extends Model<IProduct> {
+	id: string;
+	description: string;
+	image: string;
+	title: string;
+	category: string;
+	price: number | null;
+	isOrdered: boolean;
+	index: number;
+	getId(): string {
+		return this.id;
+	}
+}
+
 export class AppStatus extends Model<IAppStatus> {
-	catalog: ICard[];
-	basket: ICard[] = [];
-	order: IOrder = {
+	basket: string[] = [];
+	_catalog: Product[];
+	loading: boolean;
+	orderAddress: IOrdersDelivery = {
+		payment: '',
+		address: '',
+	};
+
+	contacts: IOrdersContacts = {
+		email: '',
+		phone: '',
+	};
+
+	protected _order: IOrder = {
+		id: '',
 		payment: '',
 		email: '',
 		phone: '',
@@ -25,83 +52,123 @@ export class AppStatus extends Model<IAppStatus> {
 		items: [],
 	};
 	preview: string | null;
-	formErrors: FormErrors = {};
+	formErrors: IFormErrors = {};
 
-	setCards(items: ICard[]) {
-		this.catalog = items;
-		this.notifyChange('items:changed', { cards: this.catalog });
+	get order() {
+		return this._order;
 	}
 
-	setPreview(item: ICard) {
+	getOrderAPI() {
+		const orderApi: IOrderAPI = {
+			payment: this._order.payment,
+			email: this._order.email,
+			phone: this._order.phone,
+			address: this._order.address,
+			total: 0,
+			items: [],
+		};
+		orderApi.items = this._order.items.map((item) => item.id);
+		orderApi.total = this.getTotal();
+		return orderApi;
+	}
+
+	getProducts(): Product[] {
+		return this._catalog;
+	}
+
+	findOrderItem(item: Product) {
+		const orderItemIndex = this._order.items.findIndex(
+			(id) => id.getId() === item.id
+		);
+
+		if (orderItemIndex !== -1) {
+			return orderItemIndex;
+		} else {
+			return null;
+		}
+	}
+
+	addItemToBasket(item: Product) {
+		if (this.findOrderItem(item) === null) {
+			this._order.items.push(item);
+			this.notifyChange('basket:changed');
+		}
+	}
+
+	removeItemFromBasket(item: Product) {
+		this._order.items = this._order.items.filter((el) => el.id != item.id);
+		this.notifyChange('basket:changed');
+	}
+
+	getTotal() {
+		this._order.total = this._order.items.reduce((a, c) => a + c.price, 0);
+		return this._order.total;
+	}
+
+	setCards(items: IProduct[]) {
+		this._catalog = items.map((item) => new Product(item, this.events));
+		this.notifyChange('items:changed', { catalog: this._catalog });
+	}
+
+	setPreview(item: Product) {
 		this.preview = item.id;
 		this.notifyChange('preview:changed', item);
 	}
 
-	addItemToBasket(item: ICard) {
-		this.basket.indexOf(item) < 1 ? this.basket.push(item) : false;
-		this.notifyChange('basket:changed', this.basket);
-		this.notifyChange('count:changed', this.basket);
+	updateCounter(): number {
+		return this.basket.length;
 	}
 
-	removeItemFromBasket(item: ICard) {
-		this.basket = this.basket.filter((elem) => elem != item);
-		this.notifyChange('basket:changed', this.basket);
-		this.notifyChange('count:changed', this.basket);
-	}
-
-	setOrdersDelivery(field: keyof IOrdersDelivery, value: string) {
+	setOrderField(field: keyof IOrderForm, value: string) {
 		this.order[field] = value;
 
-		if (this.checkDeliveryValidation()) {
+		if (this.validateOrderDelivery()) {
 			this.events.emit('order:ready', this.order);
 		}
 
-		if (this.checkDeliveryValidation()) {
+		if (this.validateOrderContact()) {
 			this.events.emit('order:ready', this.order);
 		}
 	}
 
-	setOrdersContacts(field: keyof IOrdersContacts, value: string) {
-		this.order[field] = value;
-		this.checkContactsValidation()
-			? this.events.emit('ordersContacts:changed', this.order)
-			: false;
-	}
+	validateOrderDelivery() {
+		const errors: typeof this.formErrors = {};
 
-	checkDeliveryValidation() {
-		const error: typeof this.formErrors = {};
-		const addresRegexp = /^[а-яё0-9,./\-/\s]+$/i;
-
-		if (!addresRegexp.test(this.order.address) || !this.order.address) {
-			error.address =
+		if (!this.order.address) {
+			errors.address =
 				'Пожалуйста, введите адрес, используя допустимые символы: кириллицу, пробелы, запятые, точки и тире.';
 		}
+		if (!this.order.payment) {
+			errors.payment = 'Пожалуйста, выберете способ оплаты.';
+		}
 
-		this.formErrors = error;
-		this.events.emit('deliveryForm:changed', this.formErrors);
-		return Object.keys(error).length === 0;
+		this.formErrors = errors;
+		this.events.emit('formErrors:change', this.formErrors);
+
+		return Object.keys(errors).length === 0;
 	}
 
-	checkContactsValidation() {
-		const error: typeof this.formErrors = {};
-		const emailRegepx = /^[a-zA-Z0-9._]+@[a-z]+.[a-z]{2,5}$/;
-		const phoneRegexp = /^[\+78](\d){10,11}$/;
-		if (!emailRegepx.test(this.order.email) || !this.order.email) {
-			error.email =
+	validateOrderContact() {
+		const errors: typeof this.formErrors = {};
+
+		if (!this.order.email) {
+			errors.email =
 				'Пожалуйста, укажите адрес электронной почты в формате email@email.com.';
 		}
-		if (!phoneRegexp.test(this.order.phone) || !this.order.phone) {
-			error.phone =
+
+		if (!this.order.phone) {
+			errors.phone =
 				'Пожалуйста, введите номер телефона в одном из следующих форматов: +7ХХХХХХХХХХ или 8ХХХХХХХХХХ.';
 		}
-		this.formErrors = error;
-		this.events.emit('contactsForm:changed', this.formErrors);
-		return Object.keys(error).length === 0;
+
+		this.formErrors = errors;
+		this.events.emit('formErrorsContacts:change', this.formErrors);
+
+		return Object.keys(errors).length === 0;
 	}
 
 	clearBasket() {
-		this.basket = [];
-		this.notifyChange('basket:changed', this.basket);
-		this.notifyChange('count:changed', this.basket);
+		this._order.items = [];
+		this.notifyChange('basket:changed');
 	}
 }

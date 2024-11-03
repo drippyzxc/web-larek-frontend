@@ -5,9 +5,13 @@ export abstract class UserInterfaceComponent<T> {
 		element.style.display = isVisible ? 'block' : 'none';
 	}
 
-	setText(element: HTMLElement | null, text: string) {
+	toggleClass(element: HTMLElement, className: string, force?: boolean) {
+		element.classList.toggle(className, force);
+	}
+
+	protected setText(element: HTMLElement, value: unknown) {
 		if (element) {
-			element.textContent = text;
+			element.textContent = String(value);
 		}
 	}
 

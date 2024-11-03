@@ -1,12 +1,16 @@
-import { ISuccess, ISuccessActions } from '../types';
+import { UserInterfaceComponent } from './base/userInterfaceComponent';
 import { ensureElement } from '../utils/utils';
-import { UserInterfaceComponent } from '../components/base/userInterfaceComponent';
+import { EventEmitter } from './base/events';
+
+export interface ISuccess {
+	total: number;
+}
 
 export class Success extends UserInterfaceComponent<ISuccess> {
 	protected _close: HTMLElement;
 	protected _total: HTMLElement;
 
-	constructor(container: HTMLElement, actions: ISuccessActions) {
+	constructor(container: HTMLElement, protected events: EventEmitter) {
 		super(container);
 
 		this._close = ensureElement<HTMLElement>(
@@ -18,12 +22,15 @@ export class Success extends UserInterfaceComponent<ISuccess> {
 			this.container
 		);
 
-		if (actions?.onClick) {
-			this._close.addEventListener('click', actions.onClick);
+		if (this._close) {
+			this._close.addEventListener('click', () => {
+				events.emit('success:close');
+			});
 		}
 	}
 
-	set total(value: string) {
-		this._total.textContent = `Списано ${value} синапсов`;
+	set total(value: number) {
+		const description = `Списано ${value} синапсов`;
+		this.setText(this._total, description);
 	}
 }

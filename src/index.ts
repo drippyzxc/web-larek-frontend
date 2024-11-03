@@ -1,21 +1,17 @@
 import './scss/styles.scss';
 
-import { AppStatus, CatalogChangeEvent } from './components/AppData';
-import { EventEmitter } from './components/base/events';
-import { cloneTemplate, ensureElement } from './utils/utils';
-import { Page } from './components/product';
-import { Card } from './components/card';
 import { CustomApi } from './components/customApi';
 import { API_URL, CDN_URL } from './utils/constants';
+import { EventEmitter } from './components/base/events';
+import { AppStatus, Product } from './components/AppData';
+import { Page } from './components/product';
+import { cloneTemplate, createElement, ensureElement } from './utils/utils';
 import { Modal } from './components/common/modal';
-import { Basket } from './components/basket';
-import {
-	OrdersDelivery,
-	paymentMethod,
-	OrdersContacts,
-} from './components/order';
+import { Basket, BasketProduct } from './components/basket';
+import { IOrderForm, IButtonOptions } from './types';
+import { Card } from './components/card';
+import { OrdersDelivery, OrdersContacts } from './components/order';
 import { Success } from './components/success';
-import { ICard, IOrdersContacts, IOrdersDelivery } from './types';
 
 const events = new EventEmitter();
 const api = new CustomApi(CDN_URL, API_URL);
@@ -34,196 +30,153 @@ const page = new Page(document.body, events);
 const modal = new Modal(ensureElement<HTMLElement>('#modal-container'), events);
 const basket = new Basket(cloneTemplate(basketTemplate), events);
 
-const ordersDelivery = new OrdersDelivery(
-	cloneTemplate(orderTemplate),
-	events,
-	{
-		onClick: (event: Event) => {
-			events.emit('payment:changed', event.target);
-		},
-	}
-);
+const ordersDelivery = new OrdersDelivery(cloneTemplate(orderTemplate), events);
 const ordersContacts = new OrdersContacts(
 	cloneTemplate(ordersContactsTemplate),
 	events
 );
 
-events.on<CatalogChangeEvent>('items:changed', () => {
-	page.catalog = appStatus.catalog.map((item) => {
-		const card = new Card(cloneTemplate(cardCatalogTemplate), {
-			onClick: () => events.emit('card:select', item),
+events.on('items:changed', () => {
+	page.catalog = appStatus.getProducts().map((item) => {
+		const card = new Card(cloneTemplate(cardCatalogTemplate), null, {
+			onClick: () => events.emit('preview:changed', item),
 		});
-		return card.renderContent({
-			category: item.category,
-			title: item.title,
-			image: item.image,
-			price: item.price,
-		});
+		return card.renderContent(item);
 	});
 });
 
-events.on('card:select', (item: ICard) => {
+events.on('card:select', (item: Product) => {
 	appStatus.setPreview(item);
 });
 
-events.on('preview:changed', (item: ICard) => {
-	const card = new Card(cloneTemplate(cardPreviewTemplate), {
-		onClick: () => {
-			events.emit('item:check', item);
-			if (appStatus.basket.indexOf(item) < 0) {
-				card.buttonText = 'В корзину';
-			} else {
-				card.buttonText = 'Убрать из корзины';
-			}
-		},
-	});
+events.on('preview:changed', (item: Product) => {
+	const showCard = (item: Product, buttonOptions: IButtonOptions) => {
+		const card = new Card(cloneTemplate(cardPreviewTemplate), buttonOptions, {
+			onClick: () => events.emit('item:add', item),
+		});
 
-	modal.render({
-		content: card.renderContent({
-			category: item.category,
-			title: item.title,
-			image: item.image,
-			description: item.description,
-			price: item.price,
-			buttonText:
-				appStatus.basket.indexOf(item) < 0 ? 'В корзину' : 'Убрать из корзины',
-		}),
-	});
+		modal.render({
+			content: card.renderContent(item),
+		});
+	};
+
+	if (item) {
+		api
+			.getCardItem(item.id)
+			.then((result) => {
+				item.description = result.description;
+				showCard(item, {
+					disabledButton: appStatus.findOrderItem(item) != null,
+					buttonText: 'Уже в корзине',
+				});
+			})
+			.catch(console.error);
+	} else {
+		modal.close();
+	}
 });
 
-events.on('item:check', (item: ICard) => {
-	appStatus.basket.indexOf(item) < 0
-		? events.emit('item:add', item)
-		: events.emit('item:delete', item);
-});
-
-events.on('item:add', (item: ICard) => {
+events.on('item:add', (item: Product) => {
 	appStatus.addItemToBasket(item);
+	page.setCounter(appStatus.order.items.length);
+	modal.close();
 });
 
-events.on('item:delete', (item: ICard) => {
+events.on('item:remove', (item: Product) => {
 	appStatus.removeItemFromBasket(item);
+	page.setCounter(appStatus.order.items.length);
 });
 
-events.on('basket:changed', (items: ICard[]) => {
-	basket.items = items.map((item, count) => {
-		const card = new Card(cloneTemplate(cardBasketTemplate), {
-			onClick: () => {
-				events.emit('item:delete', item);
-			},
+events.on('basket:changed', () => {
+	const basketProducts = appStatus.order.items.map((item, index) => {
+		const basketItem = new BasketProduct(cloneTemplate(cardBasketTemplate), {
+			onClick: () => events.emit('item:remove', item),
 		});
-		return card.renderContent({
+		return basketItem.renderContent({
 			title: item.title,
 			price: item.price,
-			count: (count++).toString(),
+			index: index + 1,
 		});
 	});
-	let total = 0;
-	items.forEach((item) => {
-		total = total + item.price;
+	basket.renderContent({
+		items: basketProducts,
+		total: appStatus.getTotal(),
 	});
-	basket.total = total;
-	appStatus.order.total = total;
-});
-
-events.on('count:changed', () => {
-	page.counter = appStatus.basket.length;
 });
 
 events.on('basket:open', () => {
+	page.setCounter(appStatus.order.items.length);
 	modal.render({
-		content: basket.renderContent({}),
+		content: createElement<HTMLElement>('div', {}, [
+			basket.renderContent({
+				total: appStatus.getTotal(),
+			}),
+		]),
 	});
 });
 
 events.on('order:open', () => {
 	modal.render({
 		content: ordersDelivery.render({
-			payment: '',
-			address: '',
+			address: ordersDelivery.address,
+			payment: ordersDelivery.payment,
 			valid: false,
 			errors: [],
 		}),
 	});
-	appStatus.order.items = appStatus.basket.map((item) => item.id);
-});
-
-events.on('payment:changed', (target: HTMLElement) => {
-	if (!target.classList.contains('button_alt-active')) {
-		ordersDelivery.changeButtonsClasses();
-		appStatus.order.payment = paymentMethod[target.getAttribute('name')];
-	}
 });
 
 events.on(
-	/^order\..*:change/,
-	(data: { field: keyof IOrdersDelivery; value: string }) => {
-		appStatus.setOrdersDelivery(data.field, data.value);
+	/^(order|contacts)\..*:change/,
+	(data: { field: keyof IOrderForm; value: string }) => {
+		appStatus.setOrderField(data.field, data.value);
 	}
 );
 
-events.on('deliveryForm:changed', (errors: Partial<IOrdersDelivery>) => {
-	const { payment, address } = errors;
-	ordersDelivery.valid = !payment && !address;
-	ordersDelivery.errors = Object.values({ payment, address })
+events.on('formErrors:change', (errors: Partial<IOrderForm>) => {
+	const { address, payment } = errors;
+	ordersDelivery.valid = !address && !payment;
+	ordersDelivery.errors = Object.values({ address, payment })
 		.filter((i) => !!i)
-		.join('; ');
+		.join(' и ');
 });
-
-events.on('ordersDelivery:changed', () => {
-	ordersDelivery.valid = true;
+events.on('formErrorsContacts:change', (errors: Partial<IOrderForm>) => {
+	const { email, phone } = errors;
+	ordersContacts.valid = !email && !phone;
+	ordersContacts.errors = Object.values({ phone, email })
+		.filter((i) => !!i)
+		.join(' и ');
 });
 
 events.on('order:submit', () => {
 	modal.render({
 		content: ordersContacts.render({
-			email: '',
 			phone: '',
+			email: '',
 			valid: false,
 			errors: [],
 		}),
 	});
-	appStatus.order.items = appStatus.basket.map((item) => item.id);
 });
 
-events.on(
-	/^contacts\..*:change/,
-	(data: { field: keyof IOrdersContacts; value: string }) => {
-		appStatus.setOrdersContacts(data.field, data.value);
-	}
-);
-
-events.on('contactsForm:changed', (errors: Partial<IOrdersContacts>) => {
-	const { email, phone } = errors;
-	ordersContacts.valid = !email && !phone;
-	ordersContacts.errors = Object.values({ email, phone })
-		.filter((i) => !!i)
-		.join('; ');
-});
-
-events.on('ordersContacts:changed', () => {
-	ordersContacts.valid = true;
-});
-
-events.on('contacts:submit', () => {
+events.on('success:open', () => {
 	api
-		.orderProducts(appStatus.order)
-		.then((result) => {
+		.orderProducts(appStatus.getOrderAPI())
+		.then(() => {
+			const success = new Success(cloneTemplate(successTemplate), events);
+			success.total = appStatus.getTotal();
+			modal.close();
 			appStatus.clearBasket();
-			const success = new Success(cloneTemplate(successTemplate), {
-				onClick: () => {
-					modal.close();
-				},
-			});
-			console.log(result);
-			success.total = result.total.toString();
+			page.counter = appStatus.basket.length;
 			modal.render({
 				content: success.renderContent({}),
 			});
 		})
-		.catch((error) => {
-			console.error(error);
-		});
+		.catch(console.error);
+});
+
+events.on('success:close', () => {
+	modal.close();
 });
 
 events.on('modal:open', () => {

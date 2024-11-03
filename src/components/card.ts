@@ -1,29 +1,24 @@
-import { ICard } from '../types/index';
+import { IProduct, IButtonOptions } from '../types';
 import { ensureElement } from '../utils/utils';
 import { UserInterfaceComponent } from '../components/base/userInterfaceComponent';
-
-const categories: { [key: string]: string } = {
-	'софт-скил': 'card__category_soft',
-	'хард-скил': 'card__category_hard',
-	кнопка: 'card__category_button',
-	дополнительное: 'card__category_additional',
-	другое: 'card__category_other',
-};
 
 interface ICardActions {
 	onClick: (event: MouseEvent) => void;
 }
 
-export class Card extends UserInterfaceComponent<ICard> {
-	protected _category: HTMLElement;
+export class Card extends UserInterfaceComponent<IProduct> {
+	protected _category?: HTMLElement;
 	protected _title: HTMLElement;
 	protected _image?: HTMLImageElement;
 	protected _description?: HTMLElement;
 	protected _price?: HTMLElement;
-	protected _count?: HTMLElement;
-	protected _button?: HTMLButtonElement;
+	_button?: HTMLButtonElement;
 
-	constructor(container: HTMLElement, actions?: ICardActions) {
+	constructor(
+		protected container: HTMLElement,
+		buttonOptions?: IButtonOptions,
+		actions?: ICardActions
+	) {
 		super(container);
 
 		this._category = container.querySelector('.card__category');
@@ -31,8 +26,12 @@ export class Card extends UserInterfaceComponent<ICard> {
 		this._image = container.querySelector('.card__image');
 		this._description = container.querySelector('.card__text');
 		this._price = ensureElement<HTMLElement>('.card__price', container);
-		this._count = container.querySelector('.basket__item-index');
-		this._button = container.querySelector('.button');
+		this._button = container.querySelector('.card__button');
+
+		if (buttonOptions?.disabledButton) {
+			this.disableElement(this._button, true);
+			this.setText(this._button, buttonOptions.buttonText);
+		}
 
 		if (actions?.onClick) {
 			if (this._button) {
@@ -77,42 +76,30 @@ export class Card extends UserInterfaceComponent<ICard> {
 		}
 	}
 
-	set button(value: string) {
-		this.setText(this._button, value);
-	}
-
 	set price(value: number | null) {
 		this.setText(this._price, value ? `${value} синапсов` : 'Бесценно');
 		if (value === null) {
 			this.disableElement(this._button, true);
+			this.setText(this._button, 'Нельзя купить');
 		}
-	}
-
-	get price(): number {
-		return Number(this._price.textContent) || null;
-	}
-
-	set index(value: string) {
-		this._count.textContent = value;
-	}
-
-	get index(): string {
-		return this._count.textContent || '';
 	}
 
 	set category(value: string) {
+		const categoryMap: Record<string, string> = {
+			'софт-скил': 'soft',
+			'хард-скил': 'hard',
+			другое: 'other',
+			дополнительное: 'additional',
+			кнопка: 'button',
+		};
+
+		const enCategory = categoryMap[value];
+
+		Object.values(categoryMap).forEach((category) => {
+			this.toggleClass(this._category, `card__category_${category}`, false);
+		});
+		this.toggleClass(this._category, `card__category_${enCategory}`, true);
 		this.setText(this._category, value);
-		this._category.classList.add(categories[value]);
-	}
-
-	get category() {
-		return this._category.textContent || '';
-	}
-
-	set buttonText(value: string) {
-		if (this._button) {
-			this._button.textContent = value;
-		}
 	}
 
 	setDisabled() {

@@ -25,7 +25,6 @@ export class Modal extends UserInterfaceComponent<IModalData> {
 			event.stopPropagation()
 		);
 	}
-
 	set content(value: HTMLElement) {
 		this._content.replaceChildren(value);
 	}

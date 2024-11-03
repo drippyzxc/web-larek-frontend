@@ -55,11 +55,9 @@ yarn build
 
 ```
 interface IAppStatus {
-	catalog: ICard[];
-	basket: ICard[];
+	catalog: IProduct[];
+	basket: IProduct[];
 	preview: string | null;
-	delivery: IOrdersDelivery | null;
-	contact: IOrdersContacts | null;
 	order: IOrder | null;
 }
 ```
@@ -68,9 +66,9 @@ interface IAppStatus {
 
 ```
 interface IPage {
-    counter: number;
-    catalog: HTMLElement[];
-    locked: boolean;
+	counter: number;
+	catalog: HTMLElement[];
+	locked: boolean;
 }
 ```
 
@@ -83,7 +81,26 @@ interface ICard {
 	image: string;
 	title: string;
 	category: string;
-	price: number;
+	price: number | null;
+	getId(): string;
+}
+```
+
+Отображение карточки товара:
+
+```
+interface IProduct extends ICard {
+	button?: string;
+}
+```
+
+Настройки кнопки:
+
+```
+interface IButtonOptions {
+	disabledButton: boolean;
+	buttonText: string;
+	isInBasket?: boolean;
 }
 ```
 
@@ -105,11 +122,29 @@ interface IOrdersContacts {
 }
 ```
 
-Заказ:
+Структура заказа:
 
 ```
-interface IOrder extends IOrdersDelivery, IOrdersContacts {
-	total: number | null;
+interface IOrder {
+	id: string;
+	payment: string;
+	email: string;
+	phone: string;
+	address: string;
+	total: number;
+	items: IProduct[];
+}
+```
+
+Отправка данных списка заказов на сервер:
+
+```
+interface IOrderAPI {
+	payment: string;
+	email: string;
+	phone: string;
+	address: string;
+	total: number;
 	items: string[];
 }
 ```
@@ -118,8 +153,8 @@ interface IOrder extends IOrdersDelivery, IOrdersContacts {
 
 ```
 interface IOrderSuccess {
-	id: string;
-	total: number | null;
+	id: string[];
+	total: number;
 }
 ```
 
@@ -128,10 +163,19 @@ interface IOrderSuccess {
 ```
 
 interface ISuccess {
-image: string;
-title: string;
-description: string;
-total: number | null;
+	total: number;
+}
+
+```
+
+Отображение корзины с товарами:
+
+```
+
+interface IBasket {
+	items: HTMLElement[];
+	total: number;
+	button: HTMLButtonElement;
 }
 
 ```
@@ -139,11 +183,55 @@ total: number | null;
 Данные корзины:
 
 ```
-
-interface IBasket {
-items: HTMLElement[];
-total: number;
+interface IBasketModel {
+	items: IProduct[];
+	getTotal(): number;
+	add(id: IProduct): void;
+	remove(id: IProduct): void;
+	clearBasket(): void;
 }
+
+```
+
+Отображение отдельного товара в корзине:
+
+```
+interface IBasketProduct {
+	deleteButton: string;
+	index: number;
+	title: string;
+	price: number;
+}
+```
+
+Содержимое модального окна:
+
+```
+interface IModalData {
+	content: HTMLElement;
+}
+```
+
+Обработка клика:
+
+```
+interface IBasketActions {
+	onClick: (event: MouseEvent) => void;
+}
+```
+
+Брокер событий:
+
+```
+interface IEventEmitter {
+    emit: (event: string, data: unknown) => void;
+}
+```
+
+Общий тип данных для всех форм:
+
+```
+type IOrderForm = IOrdersDelivery & IOrdersContacts;
 
 ```
 
@@ -165,7 +253,7 @@ interface IActions {
 
 ## Архитектура приложения
 
-<img src="https://github.com/drippyzxc/web-larek-oop-image/blob/main/oop-web-larek2.drawio.png" />
+<img src="https://github.com/drippyzxc/web-larek-oop-image/blob/main/web-larek-oop3.drawio.png" />
 
 ### Базовый код
 
@@ -187,9 +275,9 @@ interface IActions {
 
 Методы:
 
+- `handleResponse(response: Response)` - обрабатывает ответ сервера, возвращая его в формате json, или ошибку, если ответ пуст.
 - `get(uri: string)` - выполняет GET-запрос и возвращает ответ от сервера.
 - `post(uri: string, data: object, method: ApiPostMethods = 'POST')` - отправляет POST-запрос с JSON-данными на указанный endpoint. Метод запроса можно изменить третьим параметром.
-- `handleResponse(response: Response)` - обрабатывает ответ сервера, возвращая его в формате json, или ошибку, если ответ пуст.
 
 #### Класс EventEmitter
 
@@ -228,7 +316,8 @@ interface IActions {
 Методы:
 
 - `toggleVisibility(element: HTMLElement, isVisible: boolean)` - переключает видимость элемента.
-- `setText(element: HTMLElement, text: string)` - устанавливает текстовое содержимое.
+- `toggleClass(element: HTMLElement, className: string, force?: boolean)` - переключает класс элемента.
+- `protected setText(element: HTMLElement, value: unknown)` - устанавливает текстовое содержимое.
 - `disableElement(element: HTMLElement, isDisabled: boolean)` - блокирует элемент.
 - `protected setImage(element: HTMLImageElement, src: string, alt?: string)` - устанавливает изображение с альтернативным текстом.
 - `protected setHidden(element: HTMLElement)` - скрывает элемент.
@@ -237,28 +326,74 @@ interface IActions {
 
 ### Компоненты модели данных
 
+#### Класс Form
+
+Класс предназначен для отображения формы и взаимодействия с ней.
+
+Конструктор класса:
+
+`constructor(protected container: HTMLFormElement, protected events: IEvents)` - вызывает конструктор родительского класса `Component`, принимает элемент формы и объект для управления событиями.
+
+Свойства класса:
+
+- `protected _submit: HTMLButtonElement` - элемент кнопки сабмита.
+- `protected _errors: HTMLElement` - элемент ошибки при отправке формы.
+
+Методы:
+
+- `onInputChange` (field: keyof T, value: string) - отслеживает изменения в полях ввода.
+- `set valid` (value: boolean) - устанавливает состояние кнопки сабмита, в зависимости от наличия ошибок при заполнении формы.
+- `set errors` (value: string) - устанавливает текст ошибок валидации.
+- `render` (state: Partial<T> & IFormState) - устанавливает итоговое состояние формы, включая значение полей ввода и ошибок валидации.
+
+#### Класс Modal
+
+Класс предназначен для отображения модального окна.
+
+Класс `Modal` использует интерфейс `IModalData`, чтобы определить структуру данных, передаваемых в базовый класс `Component`.
+
+Конструктор класса:
+
+`constructor(container: HTMLElement, protected events: IEvents) ` - принимает DOM-элемент, в котором будет размещено модальное окно, а также объект `events` для обработки событий.
+
+Свойства класса:
+
+- `_closeButton: HTMLButtonElement` - кнопка закрытия модального окна.
+- `_content: HTMLElement` - элемент, содержащий контент модального окна.
+
+Методы:
+
+- `set content(value: HTMLElement)` - устанавливает содержимое модального окна.
+- `open()` - открывает модальное окно.
+- `close()` - закрывает модальное окно.
+- `render(data: IModalData): HTMLElement` - создает модальное окно на основе переданных данных и открывает его.
+
 #### Класс AppStatus
 
 Класс для хранения текущего состояния приложения: данных о товарах, корзине, превью, заказе и ошибок форм. Наследуется от `Model<IAppStatus>`.
 
 Поля класса:
 
-- `catalog: ICard[]` - товары в каталоге.
-- `basket: ICard[] = []` - товары в корзине.
+- `basket: string[] = []` - товары в корзине.
+- `catalog: Product[]` - товары в каталоге.
 - `order: IOrder` - состояние заказа.
 - `preview: string | null` - текущий товар в модальном окне.
 - `formErrors: FormErrors = {}` - ошибки форм.
 
 Методы класса:
 
-- `setCards()` - задает каталог товаров.
-- `setPreview()` - показывает товар в модальном окне.
+- `getOrderAPI()` - получает данные заказа.
+- `getProducts()` - получает данные продукта.
+- `findOrderItem()` - задает поиск элемента.
 - `addItemToBasket()` - добавляет товар в корзину.
 - `removeItemFromBasket()` - удаляет товар из корзины.
-- `setOrdersDelivery()` - задает данные для доставки и проверяет их корректность.
-- `setOrdersContacts()` - задает контактные данные и проверяет их корректность.
-- `checkDeliveryValidation()` - валидация формы с адресом доставки и выбором способа оплаты.
-- `checkContactsValidation()` - валидация формы с почтой и телефоном.
+- `getTotal()` - получает итоговую стоимость корзины.
+- `setCards()` - задает каталог товаров.
+- `setPreview()` - показывает товар в модальном окне.
+- `updateCounter()` - обновляет счётчик корзины.
+- `setOrderField()` - задает валидацию форм.
+- `validateOrderDelivery()` - валидация формы с адресом доставки и выбором способа оплаты.
+- `validateOrderContact()` - валидация формы с почтой и телефоном.
 - `clearBasket()` - очищает корзину.
 
 #### Класс Basket
@@ -271,25 +406,46 @@ interface IActions {
 
 Свойства класса:
 
-- `_list: HTMLElement` - список товаров в корзине.
-- `_total: HTMLElement` - итоговая стоимость.
-- `_button: HTMLButtonElement` - кнопка заказа.
+- `protected _list: HTMLElement` - список товаров в корзине.
+- `protected _total: HTMLElement` - итоговая стоимость.
+- `protected _button: HTMLButtonElement` - кнопка заказа.
 
 Методы:
 
 - `set items(items: HTMLElement[])` - устанавливает список товаров.
 - `set total(total: number)` - устанавливает итоговую стоимость.
 
+#### Класс BasketProduct
+
+Класс для отображения товаров в корзине и управления ими.
+
+Конструктор класса:
+
+`constructor(container: HTMLElement, actions?: IBasketActions)` - инициализирует элементы корзины, для управления товаром.
+
+Свойства класса:
+
+- `protected _deleteButton: HTMLButtonElement;` - кнопка удаления товара из корзины.
+- `protected _list: HTMLElement` - список товаров в корзине.
+- `protected _total: HTMLElement` - итоговая стоимость.
+- `protected _button: HTMLButtonElement` - кнопка заказа.
+
+Методы:
+
+- `set title(value: string)` - устанавливает название товара.
+- `set index(value: number)` - устанавливает индекс товара.
+- `set price(value: number)` - устанавливает стоимость товара в корзине.
+
 #### Класс Card
 
 Класс для отображения карточки товара.
 
 Конструктор класса:
-`constructor(container: HTMLElement, actions?: ICardActions)` - принимает `container` и действия для карточки.
+`constructor(protected container: HTMLElement, buttonOptions?: IButtonOptions, actions?: ICardActions)` - принимает `container` и действия для карточки.
 
 Свойства класса:
 
--`_category`, `_title`, `_image`, `_description`, `_button`, `_price`, `_count` - элементы для отображения информации о товаре.
+-`_category`, `_title`, `_image`, `_description`, `_price`, `_button`,- элементы для отображения информации о товаре.
 
 Методы:
 
@@ -299,8 +455,8 @@ interface IActions {
 - `get title(): string` - получает название товара.
 - `set image(value: string)` - устанавливает изображение товара.
 - `set description(value: string | string[])` - устанавливает описание товара.
-- `set price: number | nul` - устанавливает стоимость товара.
-- `set category(): string ` - устанавливает категорию товара.
+- `set price(value: number | null)` - устанавливает стоимость товара.
+- `set category(value: string) ` - устанавливает категорию товара.
 
 #### Класс OrdersContacts
 
@@ -308,7 +464,13 @@ interface IActions {
 
 Конструктор класса:
 
-- `constructor(container: HTMLFormElement, events: IEvents)` - Принимает `HTML-элемент` формы и объект событий `events`. Вызывает конструктор родительского класса `Form`.
+- `constructor(container: HTMLFormElement, events: EventEmitter)` - Принимает `HTML-элемент` формы и объект событий `events`. Вызывает конструктор родительского класса `Form`.
+
+Свойства класса:
+
+- `protected _button: HTMLElement` - кнопка подтверждения.
+- `protected _email: HTMLElement;` - почта пользователя.
+- `protected _phone: HTMLElement;` - телефон пользователя.
 
 Методы:
 
@@ -321,18 +483,21 @@ interface IActions {
 
 Конструктор класса:
 
-- `constructor(container: HTMLFormElement, events: IEvents, actions: IActions)` - Принимает `HTML-форму`, объект событий и объект доступных действий `actions`. Вызывает конструктор родительского класса `Form`.
+- `constructor(container: HTMLFormElement, events: IEvents)` - Принимает `HTML-форму`, объект событий. Вызывает конструктор родительского класса `Form`.
 
 Свойства класса:
 
 - `protected _card: HTMLButtonElement` - кнопка выбора оплаты картой.
 - `protected _cash: HTMLButtonElement;` - кнопка выбора оплаты наличными.
+- `protected _paymentContainer: HTMLDivElement;` - контейнер с кнопками выбора оплаты.
+- `payment: string;` - способ оплаты заказа, выбранный пользователем.
 
 Методы:
 
 - `set address(value: string)` - устанавливает адрес доставки в соответствующее поле формы.
+- `setPayment(field: keyof IOrderForm, value: string)` - устанавливает способ оплаты.
 
-#### Класс Product
+#### Класс Page
 
 Класс отвечает за формирование главной страницы и управление её элементами, такими как каталог товаров, корзина и счетчик товаров.
 
@@ -358,7 +523,7 @@ interface IActions {
 Класс отвечает за отображение сообщения об успешном оформлении заказа.
 
 Конструктор класса:
-`constructor(container: HTMLElement, actions: ISuccessActions)` - Принимает контейнер `HTMLElement` для сообщения и объект доступных действий `actions`, которые могут быть выполнены при успешном заказе.
+`constructor(container: HTMLElement, protected events: EventEmitter)` - Принимает контейнер `HTMLElement` для сообщения и объект доступных действий `actions`, которые могут быть выполнены при успешном заказе.
 
 Свойства класса:
 
@@ -368,24 +533,3 @@ interface IActions {
 Методы:
 
 - `set total` (total: number) - устанавливает итоговую стоимость заказа.
-
-#### Класс Modal
-
-Класс предназначен для отображения модального окна.
-
-Класс `Modal` использует интерфейс `IModalData`, чтобы определить структуру данных, передаваемых в базовый класс `Component`.
-
-Конструктор класса:
-`constructor(container: HTMLElement, protected events: IEvents) ` - принимает DOM-элемент, в котором будет размещено модальное окно, а также объект `events` для обработки событий.
-
-Свойства класса:
-
-- `_closeButton: HTMLButtonElement` - кнопка закрытия модального окна.
-- `_content: HTMLElement` - элемент, содержащий контент модального окна.
-
-Методы:
-
-- `set content(value: HTMLElement)` - устанавливает содержимое модального окна.
-- `open()` - открывает модальное окно.
-- `close()` - закрывает модальное окно.
-- `render(data: IModalData): HTMLElement` - создает модальное окно на основе переданных данных и открывает его.

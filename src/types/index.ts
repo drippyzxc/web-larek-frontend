@@ -14,24 +14,15 @@ export interface IEvents {
 	): (data: T) => void;
 }
 
-export type ApiListResponse<Type> = {
-	total: number;
-	items: Type[];
-};
-
-export type ApiPostMethods = 'POST' | 'PUT' | 'DELETE';
-
 export interface IApi {
+	getCardItem: (id: string) => Promise<ICard>;
 	getCardsList: () => Promise<ICard[]>;
-	orderProducts: (order: IOrder) => Promise<IOrderSuccess>;
 }
 
 export interface IAppStatus {
-	catalog: ICard[];
-	basket: ICard[];
+	catalog: IProduct[];
+	basket: IProduct[];
 	preview: string | null;
-	delivery: IOrdersDelivery | null;
-	contact: IOrdersContacts | null;
 	order: IOrder | null;
 }
 
@@ -47,7 +38,18 @@ export interface ICard {
 	image: string;
 	title: string;
 	category: string;
-	price: number;
+	price: number | null;
+	getId(): string;
+}
+
+export interface IProduct extends ICard {
+	button?: string;
+}
+
+export interface IButtonOptions {
+	disabledButton: boolean;
+	buttonText: string;
+	isInBasket?: boolean;
 }
 
 export interface IOrdersDelivery {
@@ -60,34 +62,66 @@ export interface IOrdersContacts {
 	phone: string;
 }
 
-export interface IOrder extends IOrdersDelivery, IOrdersContacts {
-	total: number | null;
+export interface IOrder {
+	id: string;
+	payment: string;
+	email: string;
+	phone: string;
+	address: string;
+	total: number;
+	items: IProduct[];
+}
+
+export interface IOrderAPI {
+	payment: string;
+	email: string;
+	phone: string;
+	address: string;
+	total: number;
 	items: string[];
 }
 
 export interface IOrderSuccess {
-	id: string;
-	total: number | null;
+	id: string[];
+	total: number;
 }
 
 export interface ISuccess {
-	image: string;
-	title: string;
-	description: string;
-	total: number | null;
+	total: number;
 }
 
 export interface IBasket {
 	items: HTMLElement[];
 	total: number;
+	button: HTMLButtonElement;
 }
 
-export type FormErrors = Partial<Record<keyof IOrder, string>>;
+export interface IBasketModel {
+	items: IProduct[];
+	getTotal(): number;
+	add(id: IProduct): void;
+	remove(id: IProduct): void;
+	clearBasket(): void;
+}
 
-export interface IActions {
+export interface IBasketProduct {
+	deleteButton: string;
+	index: number;
+	title: string;
+	price: number;
+}
+
+export interface IModalData {
+	content: HTMLElement;
+}
+
+export interface IBasketActions {
 	onClick: (event: MouseEvent) => void;
 }
 
-export interface ISuccessActions {
-	onClick: () => void;
+export interface IEventEmitter {
+	emit: (event: string, data: unknown) => void;
 }
+
+export type IOrderForm = IOrdersDelivery & IOrdersContacts;
+export type IFormErrors = Partial<Record<keyof IOrder, string>>;

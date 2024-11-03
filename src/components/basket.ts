@@ -1,4 +1,4 @@
-import { IBasket } from '../types';
+import { IBasket, IBasketActions, IBasketProduct } from '../types';
 import { ensureElement, createElement } from '../utils/utils';
 import { UserInterfaceComponent } from '../components/base/userInterfaceComponent';
 import { EventEmitter } from './base/events';
@@ -16,10 +16,11 @@ export class Basket extends UserInterfaceComponent<IBasket> {
 		this._button = this.container.querySelector('.basket__button');
 
 		if (this._button) {
-			this._button.addEventListener('mouseup', () => {
+			this._button.addEventListener('click', () => {
 				events.emit('order:open');
 			});
 		}
+
 		this.items = [];
 	}
 
@@ -39,5 +40,47 @@ export class Basket extends UserInterfaceComponent<IBasket> {
 
 	set total(total: number) {
 		this.setText(this._total, `${total.toString()} синапсов`);
+	}
+
+	toggleButton(state: boolean) {
+		this.disableElement(this._button, state);
+	}
+}
+
+export class BasketProduct extends UserInterfaceComponent<IBasketProduct> {
+	protected _deleteButton: HTMLButtonElement;
+	protected _index: HTMLElement;
+	protected _title: HTMLElement;
+	protected _price: HTMLElement;
+
+	constructor(container: HTMLElement, actions?: IBasketActions) {
+		super(container);
+
+		this._deleteButton = ensureElement<HTMLButtonElement>(
+			'.card__button',
+			container
+		);
+		this._index = ensureElement<HTMLElement>('.basket__item-index', container);
+		this._title = ensureElement<HTMLElement>('.card__title', container);
+		this._price = ensureElement<HTMLElement>('.card__price', container);
+
+		if (this._deleteButton) {
+			this._deleteButton.addEventListener('click', (evt) => {
+				this.container.remove();
+				actions?.onClick(evt);
+			});
+		}
+	}
+
+	set title(value: string) {
+		this.setText(this._title, value);
+	}
+
+	set index(value: number) {
+		this.setText(this._index, value);
+	}
+
+	set price(value: number) {
+		this.setText(this._price, value + ' синапсов');
 	}
 }

@@ -1,5 +1,5 @@
-import { ApiListResponse, ICard, IApi, IOrder, IOrderSuccess } from '../types';
-import { Api } from './base/api';
+import { IOrderSuccess, IOrderAPI, ICard, IApi } from '../types';
+import { Api, ApiListResponse } from './base/api';
 
 export class CustomApi extends Api implements IApi {
 	readonly cdn: string;
@@ -7,6 +7,13 @@ export class CustomApi extends Api implements IApi {
 	constructor(cdn: string, baseUrl: string, options?: RequestInit) {
 		super(baseUrl, options);
 		this.cdn = cdn;
+	}
+
+	getCardItem(id: string): Promise<ICard> {
+		return this.get(`/product/${id}`).then((item: ICard) => ({
+			...item,
+			image: this.cdn + item.image,
+		}));
 	}
 
 	getCardsList(): Promise<ICard[]> {
@@ -18,7 +25,17 @@ export class CustomApi extends Api implements IApi {
 		);
 	}
 
-	orderProducts(order: IOrder): Promise<IOrderSuccess> {
-		return this.post(`/order`, order).then((data: IOrderSuccess) => data);
+	orderProducts(order: IOrderAPI): Promise<IOrderSuccess> {
+		return this.post('/order', order).then((data: IOrderSuccess) => data);
+	}
+
+	orderProductsSuccess(order: IOrderAPI) {
+		return this.post('/order', order)
+			.then((result: IOrderSuccess) => {
+				result;
+			})
+			.catch((err) => {
+				console.error(err);
+			});
 	}
 }
